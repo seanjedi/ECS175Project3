@@ -11,7 +11,7 @@ using namespace std;
 ////////////////////
 //Global Variables//
 ////////////////////
-float *PixelBuffer;
+float *PixelBuffer, *TempBuffer;
 string inputFile;
 char quit;
 int windowSizeX = 1000, windowSizeY = 1000, style, mode, polyhedraCount, currentID, halfToning;
@@ -31,7 +31,7 @@ struct Vertex
 };
 
 /*
-
+//Needed if making RGB Values, not necessary but makes things clear
 struct RGB
 {
 	float R;
@@ -54,6 +54,8 @@ void boundBox();
 void setScreen();
 void setBoundaryBox();
 Vertex toNDCtoPixel(float x, float y, float z, int mode);
+void makePixel(int x, int y, float* PixelBuffer, float intensity);
+void setPixelBuffer(float* PixelBuffer);
 
 
 //Define a Boundary Box struct
@@ -298,6 +300,65 @@ public:
 		}
 	}
 
+	///////////////////////
+	//Rasterize Triangles//
+	///////////////////////
+	//Rasterize Triangles one at a time for Painters Algorithm
+	void rasterizeTriangles(bool leftSide) {
+		int xEnd;
+		int xStart;
+		if (leftSide) {
+			xStart = 0;
+			xEnd = 500;
+		}
+		else{
+			xStart = 500;
+			xEnd = 1000;
+		}
+		for (int y = 0; y < windowSizeY; y++) {
+			bool flag = false, inside = false;
+			float leftIntensity, rightIntensity, intensity;
+			int left = -1, right = -1;
+			for (int x = xStart; x < xEnd; x++) {
+				//If not inside, check if you hit the left side
+				//If so then record left value, find right value, and move to right value
+				if (!inside) {
+					if (TempBuffer[((windowSizeX * y) + x) * 3] != 0) {
+						left = x;
+						leftIntensity = TempBuffer[((windowSizeX * y) + x) * 3];
+						for (int i = x + 1; i < windowSizeX; i++) {
+							if (TempBuffer[((windowSizeX * y) + i) * 3] != 0) {
+								right = i;
+								rightIntensity = TempBuffer[((windowSizeX * y) + i) * 3];
+								inside = true;
+							}
+						}
+					}
+				} else {
+					//If I haven't reached the right value yet, keep going inside
+					//Else look for a new right value and update left/right, if none found then no longer inside! 
+					if (x != right) {
+						intensity = ((float(right) - float(x)) / (float(right) - float(left)) * leftIntensity)
+							+ ((float(x) - float(left)) / (float(right) - float(left)) * rightIntensity);
+						makePixel(x, y, TempBuffer, intensity);
+					}else{
+						inside = false;
+						left = right;
+						leftIntensity = rightIntensity;
+						for (int i = x + 1; i < windowSizeX; i++) {
+							if (TempBuffer[((windowSizeX * y) + i) * 3] != 0) {
+								right = i;
+								rightIntensity = TempBuffer[((windowSizeX * y) + i) * 3];
+								inside = true;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+
 	/////////////////////////////////////
 	//Write polygon to the Pixel Buffer//
 	/////////////////////////////////////
@@ -311,7 +372,7 @@ public:
 			triangles[i].lightIntensity[0] = phongModel(triangles[i].a, triangles[i].normals);
 			triangles[i].lightIntensity[1] = phongModel(triangles[i].b, triangles[i].normals);
 			triangles[i].lightIntensity[2] = phongModel(triangles[i].c, triangles[i].normals);
-			//cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
+			cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
 		}
 
 		//Painter's Algorithm
@@ -323,6 +384,7 @@ public:
 		zLayers = paintersAlgorithm('z');
 
 		for (int i = 0; i < triangleCount; i++) {
+			setPixelBuffer(TempBuffer);
 			//Draw XY
 			edge1 = triangles[zLayers[i]].a;
 			edge2 = triangles[zLayers[i]].b;
@@ -333,23 +395,9 @@ public:
 			tempLightA = triangles[zLayers[i]].lightIntensity[0];
 			tempLightB = triangles[zLayers[i]].lightIntensity[1];
 			tempLightC = triangles[zLayers[i]].lightIntensity[2];
-			drawBresenham(temp1.x, temp1.y, temp2.x, temp2.y, tempLightA, tempLightB);
-			drawBresenham(temp2.x, temp2.y, temp3.x, temp3.y, tempLightB, tempLightC);
-			drawBresenham(temp3.x, temp3.y, temp1.x, temp1.y, tempLightC, tempLightA);
-
-			//Draw XZ
-			edge1 = triangles[yLayers[i]].a;
-			edge2 = triangles[yLayers[i]].b;
-			edge3 = triangles[yLayers[i]].c;
-			temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 2);
-			temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 2);
-			temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 2);
-			tempLightA = triangles[yLayers[i]].lightIntensity[0];
-			tempLightB = triangles[yLayers[i]].lightIntensity[1];
-			tempLightC = triangles[yLayers[i]].lightIntensity[2];
-			drawBresenham(temp1.x, temp1.z, temp2.x, temp2.z, tempLightA, tempLightB);
-			drawBresenham(temp2.x, temp2.z, temp3.x, temp3.z, tempLightB, tempLightC);
-			drawBresenham(temp3.x, temp3.z, temp1.x, temp1.z, tempLightC, tempLightA);
+			Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA, tempLightB);
+			Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB, tempLightC);
+			Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC, tempLightA);
 
 			//Draw YZ
 			edge1 = triangles[xLayers[i]].a;
@@ -361,10 +409,36 @@ public:
 			tempLightA = triangles[xLayers[i]].lightIntensity[0];
 			tempLightB = triangles[xLayers[i]].lightIntensity[1];
 			tempLightC = triangles[xLayers[i]].lightIntensity[2];
-			drawBresenham(temp1.y, temp1.z, temp2.y, temp2.z, tempLightA, tempLightB);
-			drawBresenham(temp2.y, temp2.z, temp3.y, temp3.z, tempLightB, tempLightC);
-			drawBresenham(temp3.y, temp3.z, temp1.y, temp1.z, tempLightC, tempLightA);
+			Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
+			Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
+			Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
+			//Rasterize the Temp Buffer on left side
+			rasterizeTriangles(true);
 
+			//Draw XZ
+			edge1 = triangles[yLayers[i]].a;
+			edge2 = triangles[yLayers[i]].b;
+			edge3 = triangles[yLayers[i]].c;
+			temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 2);
+			temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 2);
+			temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 2);
+			tempLightA = triangles[yLayers[i]].lightIntensity[0];
+			tempLightB = triangles[yLayers[i]].lightIntensity[1];
+			tempLightC = triangles[yLayers[i]].lightIntensity[2];
+			Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
+			Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
+			Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
+			//Rasterize the Temp Buffer on right side
+			rasterizeTriangles(false);
+
+			
+			//Flush Temp Buffer into Pixel Buffer
+			//If value already there it overwrites, unless if there is nothing to write
+			for (int i = 0; i < 1000 * 1000 * 3; i++) {
+				if (TempBuffer[i] != 0) {
+					PixelBuffer[i] = TempBuffer[i];
+				}
+			}
 		}
 	}
 
@@ -411,6 +485,7 @@ int main(int argc, char *argv[])
 	getSettings(argc, argv);
 	setBoundaryBox();
 	PixelBuffer = new float[windowSizeX * windowSizeY * 3];
+	TempBuffer = new float[windowSizeX * windowSizeY * 3];
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE);
 	//set window size to windowSizeX by windowSizeX

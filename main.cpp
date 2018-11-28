@@ -138,8 +138,10 @@ public:
 		normal.y = ((u.z*v.x) - (u.x*v.z))/(sqrt((u.x*u.x) + (u.y*u.y) + (u.z*u.z)) + sqrt((v.x*v.x) + (v.y*v.y) + (v.z*v.z)));
 		normal.z = ((u.x*v.y) - (u.y*v.x))/(sqrt((u.x*u.x) + (u.y*u.y) + (u.z*u.z)) + sqrt((v.x*v.x) + (v.y*v.y) + (v.z*v.z)));
 
+		//Initialize lightIntensity vector
+		vector<float> intensity(3,0);
 		//Create the triangle
-		triangle newTriangle = { a, b, c, normal };
+		triangle newTriangle = { a, b, c, normal, intensity};
 		triangles.push_back(newTriangle);
 	}
 
@@ -306,10 +308,10 @@ public:
 
 		//Phong Model
 		for (int i = 0; i < triangleCount; i++) {
-			triangles[i].lightIntensity.push_back(phongModel(triangles[i].a, triangles[i].normals));
-			triangles[i].lightIntensity.push_back(phongModel(triangles[i].b, triangles[i].normals));
-			triangles[i].lightIntensity.push_back(phongModel(triangles[i].c, triangles[i].normals));
-			cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
+			triangles[i].lightIntensity[0] = phongModel(triangles[i].a, triangles[i].normals);
+			triangles[i].lightIntensity[1] = phongModel(triangles[i].b, triangles[i].normals);
+			triangles[i].lightIntensity[2] = phongModel(triangles[i].c, triangles[i].normals);
+			//cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
 		}
 
 		//Painter's Algorithm
@@ -449,7 +451,8 @@ void makePixel(int x, int y, float* PixelBuffer, float intensity)
 		PixelBuffer[((windowSizeX * y) + x) * 3] = intensity;
 		PixelBuffer[(windowSizeX * y + x) * 3 + 1] = intensity;
 		PixelBuffer[(windowSizeX * y + x) * 3 + 2] = intensity;
-	}	
+	}
+		
 }
 
 /////////////////////////////////////////////////////////////////////////////

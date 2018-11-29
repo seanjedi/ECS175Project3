@@ -309,7 +309,7 @@ public:
 	//Rasterize Triangles one at a time for Painters Algorithm
 	void rasterizeTriangles(int xStart, int xEnd, float* TempBuffer, int windowSizeX, int windowSizeY) {
 		for (int y = 0; y < windowSizeY; y++) {
-			bool flag = false, inside = false;
+			bool inside = false;
 			float leftIntensity, rightIntensity, intensity;
 			int left = -1, right = -1;
 			for (int x = xStart; x < xEnd; x++) {
@@ -669,9 +669,8 @@ void getSettings(int argc, char* argv[]) {
 	}
 	else if (argc == 1) {
 		//If no input file specified, ask for one!
-		//cout << "Specify Input File: ";
-		//getline(cin, inputFile);
-		inputFile = "input.txt";
+		cout << "Specify Input File: ";
+		getline(cin, inputFile);
 		inFile.open(inputFile);
 		if (!inFile) {
 			cerr << "Unable to open input file \nStopping Execution";

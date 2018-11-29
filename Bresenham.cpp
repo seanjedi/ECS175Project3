@@ -3,7 +3,7 @@
 #include <iostream>
 
 using namespace std;
-void makePixel(int x, int y, float* PixelBuffer, float intensity);
+void makePixel(int x, int y, float* PixelBuffer, float intensity, int windowSizeX);
 inline void max(int& a, int& b, float& c, float& d) {
 	if (a > b) {
 		int temp = a;
@@ -22,7 +22,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 		for (int i = y1; i < y2; i++) {;
 			intensity = ((float(y2) - float(i)) / (float(y2) - float(y1)) * light1) 
 				+ ((float(i) - float(y1)) / (float(y2) - float(y1)) * light2);
-			makePixel(x1, i, PixelBuffer, intensity);
+			makePixel(x1, i, PixelBuffer, intensity, windowSizeX);
 		}
 	}
 	else if (y1 == y2) {
@@ -30,7 +30,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 		for (int i = x1; i < x2; i++) {
 			intensity = ((float(x2) - float(i)) / (float(x2) - float(x1)) * light1) 
 				+ ((float(i) - float(x1)) / (float(x2) - float(x1)) * light2);
-			makePixel(i, y1,  PixelBuffer, intensity);
+			makePixel(i, y1,  PixelBuffer, intensity, windowSizeX);
 		}
 	}
 	else {
@@ -52,7 +52,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 			int p = 2 * dx - dy;
 			intensity = ((float(y2) - float(y)) / (float(y2) - float(y1)) * light1) 
 				+ ((float(y) - float(y1)) / (float(y2) - float(y1)) * light2);
-			makePixel(x, y, PixelBuffer, intensity);
+			makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			while (y < y2) {
 				y++;
 				if (p < 0)
@@ -63,7 +63,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 				}
 				intensity = ((float(y2) - float(y)) / (float(y2) - float(y1)) * light1) 
 					+ ((float(y) - float(y1)) / (float(y2) - float(y1)) * light2);
-				makePixel(x, y, PixelBuffer, intensity);
+				makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			}
 		}
 		else if (m > 0 && m < 1) {
@@ -80,7 +80,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 			int p = 2 * dy - dx;
 			intensity = ((float(x2) - float(x)) / (float(x2) - float(x1)) * light1) 
 				+ ((float(x) - float(x1)) / (float(x2) - float(x1)) * light2);
-			makePixel(x, y, PixelBuffer, intensity);
+			makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			while (x < x2) {
 				x++;
 				if (p < 0)
@@ -91,7 +91,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 				}
 				intensity = ((float(x2) - float(x)) / (float(x2) - float(x1)) * light1) 
 					+ ((float(x) - float(x1)) / (float(x2) - float(x1)) * light2);
-				makePixel(x, y, PixelBuffer, intensity);
+				makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			}
 		}
 		else if (m <= -1) {
@@ -108,7 +108,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 			int p = 2 * dx - dy;
 			intensity = ((float(y2) - float(y)) / (float(y2) - float(y1)) * light1) 
 				+ ((float(y) - float(y1)) / (float(y2) - float(y1)) * light2);
-			makePixel(x, y, PixelBuffer, intensity);
+			makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			while (y < y2) {
 				y++;
 				if (p < 0)
@@ -119,7 +119,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 				}
 				intensity = ((float(y2) - float(y)) / (float(y2) - float(y1)) * light1) 
 					+ ((float(y) - float(y1)) / (float(y2) - float(y1)) * light2);
-				makePixel(x, y, PixelBuffer, intensity);
+				makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			}
 		}
 		else if (m < 0 && m > -1) {
@@ -136,7 +136,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 			int p = 2 * dy - dx;
 			intensity = ((float(x2) - float(x)) / (float(x2) - float(x1)) * light1) 
 				+ ((float(x) - float(x1)) / (float(x2) - float(x1)) * light2);
-			makePixel(x, y, PixelBuffer, intensity);
+			makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			while (x < x2) {
 				x++;
 				if (p < 0)
@@ -147,7 +147,7 @@ void Bresenham(int x1, int x2, int y1, int y2, float* PixelBuffer, int windowSiz
 				}
 				intensity = ((float(x2) - float(x)) / (float(x2) - float(x1)) * light1) 
 					+ ((float(x) - float(x1)) / (float(x2) - float(x1)) * light2);
-				makePixel(x, y, PixelBuffer, intensity);
+				makePixel(x, y, PixelBuffer, intensity, windowSizeX);
 			}
 		}
 	}

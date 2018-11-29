@@ -1,4 +1,5 @@
 #include <GL/glut.h>
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <vector> 
@@ -11,9 +12,9 @@ using namespace std;
 ////////////////////
 //Global Variables//
 ////////////////////
-float *PixelBuffer, *TempBuffer;
+float *PixelBuffer, *TempBuffer, *ToneBuffer;
 string inputFile;
-char quit;
+char quit, halfTone;
 int windowSizeX = 1000, windowSizeY = 1000, style, mode, polyhedraCount, currentID, halfToning;
 float viewXmin, viewXmax, viewYmin, viewYmax, deltaX, deltaY, deltaZ, Delta;
 ifstream inFile;
@@ -54,8 +55,10 @@ void boundBox();
 void setScreen();
 void setBoundaryBox();
 Vertex toNDCtoPixel(float x, float y, float z, int mode);
-void makePixel(int x, int y, float* PixelBuffer, float intensity);
-void setPixelBuffer(float* PixelBuffer);
+void makePixel(int x, int y, float* PixelBuffer, float intensity, int windowSizeX);
+void setPixelBuffer(float* PixelBuffer, int windowSizeX, int windowSizeY);
+Vertex toNDC(float x, float y, float z);
+Vertex toPixel(float x, float y, float z, int mode);
 
 
 //Define a Boundary Box struct
@@ -304,17 +307,7 @@ public:
 	//Rasterize Triangles//
 	///////////////////////
 	//Rasterize Triangles one at a time for Painters Algorithm
-	void rasterizeTriangles(bool leftSide) {
-		int xEnd;
-		int xStart;
-		if (leftSide) {
-			xStart = 0;
-			xEnd = 500;
-		}
-		else{
-			xStart = 500;
-			xEnd = 1000;
-		}
+	void rasterizeTriangles(int xStart, int xEnd, float* TempBuffer, int windowSizeX, int windowSizeY) {
 		for (int y = 0; y < windowSizeY; y++) {
 			bool flag = false, inside = false;
 			float leftIntensity, rightIntensity, intensity;
@@ -340,7 +333,7 @@ public:
 					if (x != right) {
 						intensity = ((float(right) - float(x)) / (float(right) - float(left)) * leftIntensity)
 							+ ((float(x) - float(left)) / (float(right) - float(left)) * rightIntensity);
-						makePixel(x, y, TempBuffer, intensity);
+						makePixel(x, y, TempBuffer, intensity, windowSizeX);
 					}else{
 						inside = false;
 						left = right;
@@ -372,9 +365,8 @@ public:
 			triangles[i].lightIntensity[0] = phongModel(triangles[i].a, triangles[i].normals);
 			triangles[i].lightIntensity[1] = phongModel(triangles[i].b, triangles[i].normals);
 			triangles[i].lightIntensity[2] = phongModel(triangles[i].c, triangles[i].normals);
-			cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
+			//cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
 		}
-
 		//Painter's Algorithm
 		vector<int> xLayers;
 		vector<int> yLayers;
@@ -383,63 +375,170 @@ public:
 		yLayers = paintersAlgorithm('y');
 		zLayers = paintersAlgorithm('z');
 
-		for (int i = 0; i < triangleCount; i++) {
-			setPixelBuffer(TempBuffer);
-			//Draw XY
-			edge1 = triangles[zLayers[i]].a;
-			edge2 = triangles[zLayers[i]].b;
-			edge3 = triangles[zLayers[i]].c;
-			temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 1);
-			temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 1);
-			temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 1);
-			tempLightA = triangles[zLayers[i]].lightIntensity[0];
-			tempLightB = triangles[zLayers[i]].lightIntensity[1];
-			tempLightC = triangles[zLayers[i]].lightIntensity[2];
-			Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA, tempLightB);
-			Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB, tempLightC);
-			Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC, tempLightA);
+		if (halfTone == 'y') {
+			int pIntensity, xLoc, yLoc, zLoc;
+			Vertex tempPoint;
+			vector<int> shuffled;
+			for (int i = 0; i < 9; i++) shuffled.push_back(i);
+			for (int i = 0; i < triangleCount; i++) {
+				setPixelBuffer(ToneBuffer, 100, 100);
+				//Draw XY
+				edge1 = triangles[zLayers[i]].a;
+				edge2 = triangles[zLayers[i]].b;
+				edge3 = triangles[zLayers[i]].c;
+				temp1 = toNDC(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z);
+				temp2 = toNDC(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z);
+				temp3 = toNDC(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z);
+				tempLightA = triangles[zLayers[i]].lightIntensity[0];
+				tempLightB = triangles[zLayers[i]].lightIntensity[1];
+				tempLightC = triangles[zLayers[i]].lightIntensity[2];
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, ToneBuffer, 100, tempLightA, tempLightB);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, ToneBuffer, 100, tempLightB, tempLightC);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, ToneBuffer, 100, tempLightC, tempLightA);
+				rasterizeTriangles(0, 100, ToneBuffer, 100, 100);
+				//Flush XY to Pixel Buffer
+				for (int y = 0; y < 100; y++) {
+					for (int x = 0; x < 100; x++) {
+						if (ToneBuffer[((100 * y) + x) * 3] != 0) {
+							pIntensity = ToneBuffer[((100 * y) + x) * 3] * 9;
+							random_shuffle(shuffled.begin(), shuffled.end());
+							for (int i = 0; i < pIntensity; i++) {
+								xLoc = (x * 3) + (shuffled[i] % 3);
+								yLoc = (y * 3) + (shuffled[i] / 3);
+								zLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 1);
+								makePixel(tempPoint.x, tempPoint.y, PixelBuffer, 1, windowSizeX);
+							}
+						}
+					}
+				}
+				
 
-			//Draw YZ
-			edge1 = triangles[xLayers[i]].a;
-			edge2 = triangles[xLayers[i]].b;
-			edge3 = triangles[xLayers[i]].c;
-			temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 3);
-			temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 3);
-			temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 3);
-			tempLightA = triangles[xLayers[i]].lightIntensity[0];
-			tempLightB = triangles[xLayers[i]].lightIntensity[1];
-			tempLightC = triangles[xLayers[i]].lightIntensity[2];
-			Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
-			Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
-			Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
-			//Rasterize the Temp Buffer on left side
-			rasterizeTriangles(true);
+				//Draw YZ
+				setPixelBuffer(ToneBuffer, 100, 100);
+				edge1 = triangles[xLayers[i]].a;
+				edge2 = triangles[xLayers[i]].b;
+				edge3 = triangles[xLayers[i]].c;
+				temp1 = toNDC(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z);
+				temp2 = toNDC(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z);
+				temp3 = toNDC(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z);
+				tempLightA = triangles[xLayers[i]].lightIntensity[0];
+				tempLightB = triangles[xLayers[i]].lightIntensity[1];
+				tempLightC = triangles[xLayers[i]].lightIntensity[2];
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, ToneBuffer, 100, tempLightA, tempLightB);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, ToneBuffer, 100, tempLightB, tempLightC);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, ToneBuffer, 100, tempLightC, tempLightA);
+				rasterizeTriangles(0, 100, ToneBuffer, 100, 100);
+				//Flush YZ to Pixel Buffer
+				for (int z = 0; z < 100; z++) {
+					for (int y = 0; y < 100; y++) {
+						if (ToneBuffer[((100 * z) + y) * 3] != 0) {
+							pIntensity = ToneBuffer[((100 * z) + y) * 3] * 9;
+							random_shuffle(shuffled.begin(), shuffled.end());
+							for (int i = 0; i < pIntensity; i++) {
+								yLoc = (y * 3) + (shuffled[i] % 3);
+								zLoc = (z * 3) + (shuffled[i] / 3);
+								xLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 3);
+								makePixel(tempPoint.y, tempPoint.z, PixelBuffer, 1, windowSizeX);
+							}
+						}
+					}
+				}
 
-			//Draw XZ
-			edge1 = triangles[yLayers[i]].a;
-			edge2 = triangles[yLayers[i]].b;
-			edge3 = triangles[yLayers[i]].c;
-			temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 2);
-			temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 2);
-			temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 2);
-			tempLightA = triangles[yLayers[i]].lightIntensity[0];
-			tempLightB = triangles[yLayers[i]].lightIntensity[1];
-			tempLightC = triangles[yLayers[i]].lightIntensity[2];
-			Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
-			Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
-			Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
-			//Rasterize the Temp Buffer on right side
-			rasterizeTriangles(false);
+				//Draw XZ
+				setPixelBuffer(ToneBuffer, 100, 100);
+				edge1 = triangles[yLayers[i]].a;
+				edge2 = triangles[yLayers[i]].b;
+				edge3 = triangles[yLayers[i]].c;
+				temp1 = toNDC(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z);
+				temp2 = toNDC(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z);
+				temp3 = toNDC(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z);
+				tempLightA = triangles[yLayers[i]].lightIntensity[0];
+				tempLightB = triangles[yLayers[i]].lightIntensity[1];
+				tempLightC = triangles[yLayers[i]].lightIntensity[2];
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, ToneBuffer, 100, tempLightA, tempLightB);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, ToneBuffer, 100, tempLightB, tempLightC);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, ToneBuffer, 100, tempLightC, tempLightA);
+				rasterizeTriangles(0, 100, ToneBuffer, 100, 100);
+				//Flush XZ to Pixel Buffer
+				for (int z = 0; z < 100; z++) {
+					for (int x = 0; x < 100; x++) {
+						if (ToneBuffer[((100 * z) + x) * 3] != 0) {
+							pIntensity = ToneBuffer[((100 * z) + x) * 3] * 9;
+							random_shuffle(shuffled.begin(), shuffled.end());
+							for (int i = 0; i < pIntensity; i++) {
+								xLoc = (x * 3) + (shuffled[i] % 3);
+								zLoc = (z * 3) + (shuffled[i] / 3);
+								yLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 2);
+								makePixel(tempPoint.x, tempPoint.z, PixelBuffer, 1, windowSizeX);
+							}
+						}
+					}
+				}
 
-			
-			//Flush Temp Buffer into Pixel Buffer
-			//If value already there it overwrites, unless if there is nothing to write
-			for (int i = 0; i < 1000 * 1000 * 3; i++) {
-				if (TempBuffer[i] != 0) {
-					PixelBuffer[i] = TempBuffer[i];
+			}
+		} else {
+			for (int i = 0; i < triangleCount; i++) {
+				setPixelBuffer(TempBuffer, windowSizeX, windowSizeY);
+				//Draw XY
+				edge1 = triangles[zLayers[i]].a;
+				edge2 = triangles[zLayers[i]].b;
+				edge3 = triangles[zLayers[i]].c;
+				temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 1);
+				temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 1);
+				temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 1);
+				tempLightA = triangles[zLayers[i]].lightIntensity[0];
+				tempLightB = triangles[zLayers[i]].lightIntensity[1];
+				tempLightC = triangles[zLayers[i]].lightIntensity[2];
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA, tempLightB);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB, tempLightC);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC, tempLightA);
+
+				//Draw YZ
+				edge1 = triangles[xLayers[i]].a;
+				edge2 = triangles[xLayers[i]].b;
+				edge3 = triangles[xLayers[i]].c;
+				temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 3);
+				temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 3);
+				temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 3);
+				tempLightA = triangles[xLayers[i]].lightIntensity[0];
+				tempLightB = triangles[xLayers[i]].lightIntensity[1];
+				tempLightC = triangles[xLayers[i]].lightIntensity[2];
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
+				//Rasterize the Temp Buffer on left side
+				rasterizeTriangles(0, 500, TempBuffer, windowSizeX, windowSizeY);
+
+				//Draw XZ
+				edge1 = triangles[yLayers[i]].a;
+				edge2 = triangles[yLayers[i]].b;
+				edge3 = triangles[yLayers[i]].c;
+				temp1 = toNDCtoPixel(vertices[edge1].x, vertices[edge1].y, vertices[edge1].z, 2);
+				temp2 = toNDCtoPixel(vertices[edge2].x, vertices[edge2].y, vertices[edge2].z, 2);
+				temp3 = toNDCtoPixel(vertices[edge3].x, vertices[edge3].y, vertices[edge3].z, 2);
+				tempLightA = triangles[yLayers[i]].lightIntensity[0];
+				tempLightB = triangles[yLayers[i]].lightIntensity[1];
+				tempLightC = triangles[yLayers[i]].lightIntensity[2];
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
+				//Rasterize the Temp Buffer on right side
+				rasterizeTriangles(500, 1000, TempBuffer, windowSizeX, windowSizeY);
+
+
+				//Flush Temp Buffer into Pixel Buffer
+				//If value already there it overwrites, unless if there is nothing to write
+				for (int i = 0; i < 1000 * 1000 * 3; i++) {
+					if (TempBuffer[i] != 0) {
+						PixelBuffer[i] = TempBuffer[i];
+					}
 				}
 			}
 		}
+		
 	}
 
 	//Function to find a new boundary for each polyhedra
@@ -463,10 +562,12 @@ public:
 ///////////////////////////
 //Reset Pixel Buffer to 0//
 ///////////////////////////
-void setPixelBuffer(float* PixelBuffer) {
+void setPixelBuffer(float* PixelBuffer, int windowSizeX, int windowSizeY) {
 	for (int i = 0; i < windowSizeX; i++) {
 		for (int j = 0; j < windowSizeY; j++) {
 			PixelBuffer[((windowSizeX * j) + i) * 3] = 0;
+			PixelBuffer[((windowSizeX * j) + i) * 3 + 1] = 0;
+			PixelBuffer[((windowSizeX * j) + i) * 3 + 2] = 0;
 		}
 	}
 }
@@ -486,6 +587,7 @@ int main(int argc, char *argv[])
 	setBoundaryBox();
 	PixelBuffer = new float[windowSizeX * windowSizeY * 3];
 	TempBuffer = new float[windowSizeX * windowSizeY * 3];
+	ToneBuffer = new float[100 * 100 * 3];
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE);
 	//set window size to windowSizeX by windowSizeX
@@ -501,6 +603,10 @@ int main(int argc, char *argv[])
 		display();
 		cout << "Would you like to quit? (y/n)\nChooice: ";
 		cin >> quit;
+		while (quit != 'y' && quit != 'n') {
+			cout << "Please Enter a y or n: ";
+			cin >> quit;
+		}
 		if (quit == 'y') {
 			exit(0);
 		}
@@ -519,7 +625,7 @@ int main(int argc, char *argv[])
 //Make Pixel Function//
 ///////////////////////
 
-void makePixel(int x, int y, float* PixelBuffer, float intensity)
+void makePixel(int x, int y, float* PixelBuffer, float intensity, int windowSizeX)
 {
 	//Make sure it is within range
 	if (x > 0 && x < 1000 && y > 0 && y < 1000) {
@@ -538,7 +644,7 @@ void display() {
 	//Misc.
 	glClear(GL_COLOR_BUFFER_BIT);
 	glLoadIdentity();
-	setPixelBuffer(PixelBuffer);
+	setPixelBuffer(PixelBuffer, windowSizeX, windowSizeY);
 
 	setScreen();
 	for (int i = 0; i < polyhedraCount; i++)
@@ -664,6 +770,12 @@ void getSettings2() {
 	cin >> f.y;
 	cout << "  z: ";
 	cin >> f.z;
+	cout << "Would you like to have Half-Toning on? (y/n): ";
+	cin >> halfTone;
+	while (halfTone != 'y' && halfTone != 'n') {
+		cout << "Please Enter a y or n: ";
+		cin >> halfTone;
+	}
 
 	return;
 }
@@ -763,5 +875,39 @@ Vertex toNDCtoPixel(float x, float y, float z, int mode) {
 	point.z = int(zNDC * 300);
 	point.y += 10;
 	point.z += 10;
+	return point;
+}
+
+//Turn world to NDC then to Pixel
+Vertex toNDC(float x, float y, float z) {
+	Vertex point{ 0,0,0 };
+	float xNDC, yNDC, zNDC;
+	xNDC = (x - boundaryBox.Xmin) / Delta;
+	yNDC = (y - boundaryBox.Ymin) / Delta;
+	zNDC = (z - boundaryBox.Zmin) / Delta;
+
+	point.z = int(zNDC * 100);
+	point.y = int(yNDC * 100);
+	point.x = int(xNDC * 100);
+	return point;
+}
+
+//Turn world to NDC then to Pixel
+Vertex toPixel(float x, float y, float z, int mode) {
+	Vertex point{ 0,0,0 };
+	//If mode is 1, set for XY quadrant
+	if (mode == 1) {
+		point.y = 510 + y;
+		point.x = 10 + x;
+		return point;
+	}//If mode is 2, set for XZ quadrant
+	else if (mode == 2) {
+		point.x = 510 + x;
+		point.z = 510 + z;
+		return point;
+	}
+	//Else it set for YZ quadrant
+	point.y = 10 + y;
+	point.z = 10 + z;
 	return point;
 }

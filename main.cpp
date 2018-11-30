@@ -916,58 +916,58 @@ void getSettings2() {
 	cout << "n: ";
 	cin >> n;
 
-	cout << "Ka\n  R:";
+	cout << "Ka\n  R: ";
 	cin >> ka.R;
 	while (ka.R < 0 || ka.R > 1) {
-		cout << "Please Enter a value between 0 and 1\R: ";
+		cout << "Please Enter a value between 0 and 1\n  R: ";
 		cin >> ka.R;
 	}
 	cout << "  G: ";
 	cin >> ka.G;
 	while (ka.G < 0 || ka.G > 1) {
-		cout << "Please Enter a value between 0 and 1\G: ";
+		cout << "Please Enter a value between 0 and 1\n  G: ";
 		cin >> ka.G;
 	}
 	cout << "  B: ";
 	cin >> ka.B;
 	while (ka.B < 0 || ka.B > 1) {
-		cout << "Please Enter a value between 0 and 1\B: ";
+		cout << "Please Enter a value between 0 and 1\n  B: ";
 		cin >> ka.B;
 	}
-	cout << "Kd\n  R:";
+	cout << "Kd\n  R: ";
 	cin >> kd.R;
 	while (kd.R < 0 || kd.R > 1) {
-		cout << "Please Enter a value between 0 and 1\R: ";
+		cout << "Please Enter a value between 0 and 1\n  R: ";
 		cin >> kd.R;
 	}
 	cout << "  G: ";
 	cin >> kd.G;
 	while (kd.G < 0 || kd.G > 1) {
-		cout << "Please Enter a value between 0 and 1\G: ";
+		cout << "Please Enter a value between 0 and 1\n  G: ";
 		cin >> kd.G;
 	}
 	cout << "  B: ";
 	cin >> kd.B;
 	while (kd.B < 0 || kd.B > 1) {
-		cout << "Please Enter a value between 0 and 1\B: ";
+		cout << "Please Enter a value between 0 and 1\n  B: ";
 		cin >> kd.B;
 	}
-	cout << "Ka\n  R:";
+	cout << "Ka\n  R: ";
 	cin >> ks.R;
 	while (ks.R < 0 || ks.R > 1) {
-		cout << "Please Enter a value between 0 and 1\R: ";
+		cout << "Please Enter a value between 0 and 1\n  R: ";
 		cin >> ks.R;
 	}
 	cout << "  G: ";
 	cin >> ks.G;
 	while (ks.G < 0 || ks.G > 1) {
-		cout << "Please Enter a value between 0 and 1\G: ";
+		cout << "Please Enter a value between 0 and 1\n  G: ";
 		cin >> ks.G;
 	}
 	cout << "  B: ";
 	cin >> ks.B;
 	while (ks.B < 0 || ks.B > 1) {
-		cout << "Please Enter a value between 0 and 1\B: ";
+		cout << "Please Enter a value between 0 and 1\n  B: ";
 		cin >> ks.B;
 	}
 	

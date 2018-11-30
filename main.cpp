@@ -31,7 +31,7 @@ struct Vertex
 	float z;
 };
 
-/*
+
 //Needed if making RGB Values, not necessary but makes things clear
 struct RGB
 {
@@ -40,9 +40,9 @@ struct RGB
 	float B;
 };
 RGB ka, kd, ks;
-*/
+
 Vertex x, f;
-double Ia, Il, k, ka, kd, ks;
+double Ia, Il, k;
 
 //////////////////////////
 //Function Defininitions//
@@ -55,7 +55,7 @@ void boundBox();
 void setScreen();
 void setBoundaryBox();
 Vertex toNDCtoPixel(float x, float y, float z, int mode);
-void makePixel(int x, int y, float* PixelBuffer, float intensity, int windowSizeX);
+void makePixel(int x, int y, float* PixelBuffer, int windowSizeX, float Rintensity, float Gintensity, float Bintensity, int mode);
 void setPixelBuffer(float* PixelBuffer, int windowSizeX, int windowSizeY);
 Vertex toNDC(float x, float y, float z);
 Vertex toPixel(float x, float y, float z, int mode);
@@ -85,8 +85,15 @@ float min(float a, float b) {
 		return b;
 }
 //Bresenham line drawing
-void drawBresenham(int x1, int y1, int x2, int y2, float light1, float light2) {
-	Bresenham(x1, x2, y1, y2, PixelBuffer, windowSizeX, light1, light2);
+void drawBresenham(int x1, int y1, int x2, int y2, float light1, float light2, int mode) {
+	Bresenham(x1, x2, y1, y2, PixelBuffer, windowSizeX, light1, light2, mode);
+}
+
+bool checkPixel(float* tempBuffer, int windowSize, int x, int y) {
+	if (tempBuffer[((windowSize * y) + x) * 3] != 0 || tempBuffer[((windowSize * y) + x) * 3 + 1] != 0 || tempBuffer[((windowSize * y) + x) * 3 + 2] != 0)
+		return true;
+	else
+		return false;
 }
 ///////////////////////////////////
 //Polygon Object Class Definition//
@@ -102,12 +109,11 @@ public:
 		int b;
 		int c;
 		Vertex normals;
-		vector<float> lightIntensity;
+		vector<RGB> lightIntensity;
 	};
 	
 	vector<triangle> triangles;
 	vector<Vertex> vertices;
-	//vector<RGB> lightIntensity;
 
 	//Set count of vertices
 	void setMatrix(int x) {
@@ -144,7 +150,8 @@ public:
 		normal.z = ((u.x*v.y) - (u.y*v.x))/(sqrt((u.x*u.x) + (u.y*u.y) + (u.z*u.z)) + sqrt((v.x*v.x) + (v.y*v.y) + (v.z*v.z)));
 
 		//Initialize lightIntensity vector
-		vector<float> intensity(3,0);
+		RGB temp{ 0 };
+		vector<RGB> intensity(3,temp);
 		//Create the triangle
 		triangle newTriangle = { a, b, c, normal, intensity};
 		triangles.push_back(newTriangle);
@@ -153,8 +160,23 @@ public:
 	///////////////
 	//Phong Model//
 	///////////////
-	float phongModel(int point, Vertex normal) {
-		float intensity, specular, ambient, diffuse, fpMag;		
+	float phongModel(int point, Vertex normal, int mode) {
+		float intensity, specular, ambient, diffuse, fpMag, KA, KS, KD;
+		if (mode == 0) {
+			KA = ka.R;
+			KD = kd.R;
+			KS = ks.R;
+		}
+		else if (mode == 1) {
+			KA = ka.G;
+			KD = kd.G;
+			KS = ks.G;
+		}
+		else {
+			KA = ka.B;
+			KD = kd.B;
+			KS = ks.B;
+		}
 		Vertex fp, p, l, v, r;
 		p = vertices[point];
 		//Calulate fp
@@ -188,9 +210,9 @@ public:
 		float rdotv = (r.x * v.x) + (r.y * v.y) + (r.z * v.z);
 		float ndotv = (normal.x * v.x) + (normal.y * v.y) + (normal.z * v.z);
 
-		ambient = Ia * ka;
-		diffuse = kd * ndotl;
-		specular = ks * pow(rdotv, n);
+		ambient = Ia * KA;
+		diffuse = KD * ndotl;
+		specular = KS * pow(rdotv, n);
 		if ((ndotl > 0 && ndotv < 0) || (ndotl < 0 && ndotv > 0)) {
 			intensity = ambient;
 		}
@@ -310,20 +332,25 @@ public:
 	void rasterizeTriangles(int xStart, int xEnd, float* TempBuffer, int windowSizeX, int windowSizeY) {
 		for (int y = 0; y < windowSizeY; y++) {
 			bool inside = false;
-			float leftIntensity, rightIntensity, intensity;
+			RGB leftIntensity, rightIntensity, intensity;
 			int left = -1, right = -1;
 			for (int x = xStart; x < xEnd; x++) {
 				//If not inside, check if you hit the left side
 				//If so then record left value, find right value, and move to right value
 				if (!inside) {
-					if (TempBuffer[((windowSizeX * y) + x) * 3] != 0) {
+					if (checkPixel(TempBuffer, windowSizeX, x, y)){
 						left = x;
-						leftIntensity = TempBuffer[((windowSizeX * y) + x) * 3];
+						leftIntensity.R = TempBuffer[((windowSizeX * y) + x) * 3];
+						leftIntensity.G = TempBuffer[((windowSizeX * y) + x) * 3 + 1];
+						leftIntensity.B = TempBuffer[((windowSizeX * y) + x) * 3 + 2];
 						for (int i = x + 1; i < windowSizeX; i++) {
-							if (TempBuffer[((windowSizeX * y) + i) * 3] != 0) {
+							if (checkPixel(TempBuffer, windowSizeX, i, y)) {
 								right = i;
-								rightIntensity = TempBuffer[((windowSizeX * y) + i) * 3];
+								rightIntensity.R = TempBuffer[((windowSizeX * y) + i) * 3];
+								rightIntensity.G = TempBuffer[((windowSizeX * y) + i) * 3 + 1];
+								rightIntensity.B = TempBuffer[((windowSizeX * y) + i) * 3 + 2];
 								inside = true;
+								break;
 							}
 						}
 					}
@@ -331,18 +358,27 @@ public:
 					//If I haven't reached the right value yet, keep going inside
 					//Else look for a new right value and update left/right, if none found then no longer inside! 
 					if (x != right) {
-						intensity = ((float(right) - float(x)) / (float(right) - float(left)) * leftIntensity)
-							+ ((float(x) - float(left)) / (float(right) - float(left)) * rightIntensity);
-						makePixel(x, y, TempBuffer, intensity, windowSizeX);
+						intensity.R = ((float(right) - float(x)) / (float(right) - float(left)) * leftIntensity.R)
+							+ ((float(x) - float(left)) / (float(right) - float(left)) * rightIntensity.R);
+						intensity.G = ((float(right) - float(x)) / (float(right) - float(left)) * leftIntensity.G)
+							+ ((float(x) - float(left)) / (float(right) - float(left)) * rightIntensity.G);
+						intensity.B = ((float(right) - float(x)) / (float(right) - float(left)) * leftIntensity.B)
+							+ ((float(x) - float(left)) / (float(right) - float(left)) * rightIntensity.B);
+						makePixel(x, y, TempBuffer, windowSizeX, intensity.R, intensity.G, intensity.B, 3);
 					}else{
 						inside = false;
 						left = right;
-						leftIntensity = rightIntensity;
+						leftIntensity.R = TempBuffer[((windowSizeX * y) + x) * 3];
+						leftIntensity.G = TempBuffer[((windowSizeX * y) + x) * 3 + 1];
+						leftIntensity.B = TempBuffer[((windowSizeX * y) + x) * 3 + 2];
 						for (int i = x + 1; i < windowSizeX; i++) {
-							if (TempBuffer[((windowSizeX * y) + i) * 3] != 0) {
+							if (checkPixel(TempBuffer, windowSizeX, i, y)) {
 								right = i;
-								rightIntensity = TempBuffer[((windowSizeX * y) + i) * 3];
+								rightIntensity.R = TempBuffer[((windowSizeX * y) + i) * 3];
+								rightIntensity.G = TempBuffer[((windowSizeX * y) + i) * 3 + 1];
+								rightIntensity.B = TempBuffer[((windowSizeX * y) + i) * 3 + 2];
 								inside = true;
+								break;
 							}
 						}
 					}
@@ -358,14 +394,20 @@ public:
 	void drawPolyhedra() {
 		Vertex temp1, temp2, temp3;
 		int edge1, edge2, edge3;
-		float tempLightA, tempLightB, tempLightC;
+		RGB tempLightA, tempLightB, tempLightC;
 
 		//Phong Model
 		for (int i = 0; i < triangleCount; i++) {
-			triangles[i].lightIntensity[0] = phongModel(triangles[i].a, triangles[i].normals);
-			triangles[i].lightIntensity[1] = phongModel(triangles[i].b, triangles[i].normals);
-			triangles[i].lightIntensity[2] = phongModel(triangles[i].c, triangles[i].normals);
-			//cout << triangles[i].lightIntensity[0] << " " << triangles[i].lightIntensity[1] << " " << triangles[i].lightIntensity[2] << endl;
+			triangles[i].lightIntensity[0].R = phongModel(triangles[i].a, triangles[i].normals, 0);
+			triangles[i].lightIntensity[0].G = phongModel(triangles[i].a, triangles[i].normals, 1);
+			triangles[i].lightIntensity[0].B = phongModel(triangles[i].a, triangles[i].normals, 2);
+			triangles[i].lightIntensity[1].R = phongModel(triangles[i].b, triangles[i].normals, 0);
+			triangles[i].lightIntensity[1].G = phongModel(triangles[i].b, triangles[i].normals, 1);
+			triangles[i].lightIntensity[1].B = phongModel(triangles[i].b, triangles[i].normals, 2);
+			triangles[i].lightIntensity[2].R = phongModel(triangles[i].c, triangles[i].normals, 0);
+			triangles[i].lightIntensity[2].G = phongModel(triangles[i].c, triangles[i].normals, 1);
+			triangles[i].lightIntensity[2].B = phongModel(triangles[i].c, triangles[i].normals, 2);
+			//cout << triangles[i].lightIntensity[0].G << " " << triangles[i].lightIntensity[1].G << " " << triangles[i].lightIntensity[2].G << endl;
 		}
 		//Painter's Algorithm
 		vector<int> xLayers;
@@ -375,8 +417,13 @@ public:
 		yLayers = paintersAlgorithm('y');
 		zLayers = paintersAlgorithm('z');
 
+		///////////////
+		//Half Toning//
+		///////////////
 		if (halfTone == 'y') {
-			int pIntensity, xLoc, yLoc, zLoc;
+			int xLoc, yLoc, zLoc;
+			float allIntensity, maxIntensity;
+			RGB pIntensity;
 			Vertex tempPoint;
 			vector<int> shuffled;
 			for (int i = 0; i < 9; i++) shuffled.push_back(i);
@@ -392,22 +439,53 @@ public:
 				tempLightA = triangles[zLayers[i]].lightIntensity[0];
 				tempLightB = triangles[zLayers[i]].lightIntensity[1];
 				tempLightC = triangles[zLayers[i]].lightIntensity[2];
-				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, ToneBuffer, 100, tempLightA, tempLightB);
-				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, ToneBuffer, 100, tempLightB, tempLightC);
-				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, ToneBuffer, 100, tempLightC, tempLightA);
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, ToneBuffer, 100, tempLightA.R, tempLightB.R, 0);
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, ToneBuffer, 100, tempLightA.G, tempLightB.G, 1);
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, ToneBuffer, 100, tempLightA.B, tempLightB.B, 2);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, ToneBuffer, 100, tempLightB.R, tempLightC.R, 0);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, ToneBuffer, 100, tempLightB.G, tempLightC.G, 1);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, ToneBuffer, 100, tempLightB.B, tempLightC.B, 2);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, ToneBuffer, 100, tempLightC.R, tempLightA.R, 0);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, ToneBuffer, 100, tempLightC.G, tempLightA.G, 1);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, ToneBuffer, 100, tempLightC.B, tempLightA.B, 2);
 				rasterizeTriangles(0, 100, ToneBuffer, 100, 100);
 				//Flush XY to Pixel Buffer
 				for (int y = 0; y < 100; y++) {
 					for (int x = 0; x < 100; x++) {
-						if (ToneBuffer[((100 * y) + x) * 3] != 0) {
-							pIntensity = ToneBuffer[((100 * y) + x) * 3] * 9;
+						if (checkPixel(ToneBuffer, 100, x, y)) {
+							maxIntensity = max(ToneBuffer[((100 * y) + x) * 3], ToneBuffer[((100 * y) + x) * 3 + 1]);
+							maxIntensity = max(maxIntensity, ToneBuffer[((100 * y) + x) * 3 + 2]);
+							int on = round(9 * maxIntensity);
+							allIntensity = ToneBuffer[((100 * y) + x) * 3] + ToneBuffer[((100 * y) + x) * 3 + 1] + ToneBuffer[((100 * y) + x) * 3 + 2];
+							pIntensity.R = int((ToneBuffer[((100 * y) + x) * 3] / allIntensity) * on);
+							pIntensity.G = int((ToneBuffer[((100 * y) + x) * 3 + 1] / allIntensity) * on);
+							pIntensity.B = int((ToneBuffer[((100 * y) + x) * 3 + 2] / allIntensity) * on);
 							random_shuffle(shuffled.begin(), shuffled.end());
-							for (int i = 0; i < pIntensity; i++) {
+							int numPixels = 0, counter = 0;
+							for (int i = 0; i < pIntensity.R; i++) {
 								xLoc = (x * 3) + (shuffled[i] % 3);
 								yLoc = (y * 3) + (shuffled[i] / 3);
 								zLoc = 0;
 								tempPoint = toPixel(xLoc, yLoc, zLoc, 1);
-								makePixel(tempPoint.x, tempPoint.y, PixelBuffer, 1, windowSizeX);
+								makePixel(tempPoint.x, tempPoint.y, PixelBuffer, windowSizeX, 1, 0, 0, 3);
+								numPixels++;
+							}
+							counter = numPixels;
+							for (int i = counter; i < pIntensity.G + counter; i++) {
+								xLoc = (x * 3) + (shuffled[i] % 3);
+								yLoc = (y * 3) + (shuffled[i] / 3);
+								zLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 1);
+								makePixel(tempPoint.x, tempPoint.y, PixelBuffer, windowSizeX, 0, 1, 0, 3);
+								numPixels++;
+							}
+							counter = numPixels;
+							for (int i = counter; i < pIntensity.B + counter; i++) {
+								xLoc = (x * 3) + (shuffled[i] % 3);
+								yLoc = (y * 3) + (shuffled[i] / 3);
+								zLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 1);
+								makePixel(tempPoint.x, tempPoint.y, PixelBuffer, windowSizeX, 0, 0, 1, 3);
 							}
 						}
 					}
@@ -425,22 +503,53 @@ public:
 				tempLightA = triangles[xLayers[i]].lightIntensity[0];
 				tempLightB = triangles[xLayers[i]].lightIntensity[1];
 				tempLightC = triangles[xLayers[i]].lightIntensity[2];
-				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, ToneBuffer, 100, tempLightA, tempLightB);
-				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, ToneBuffer, 100, tempLightB, tempLightC);
-				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, ToneBuffer, 100, tempLightC, tempLightA);
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, ToneBuffer, 100, tempLightA.R, tempLightB.R, 0);
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, ToneBuffer, 100, tempLightA.G, tempLightB.G, 1);
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, ToneBuffer, 100, tempLightA.B, tempLightB.B, 2);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, ToneBuffer, 100, tempLightB.R, tempLightC.R, 0);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, ToneBuffer, 100, tempLightB.G, tempLightC.G, 1);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, ToneBuffer, 100, tempLightB.B, tempLightC.B, 2);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, ToneBuffer, 100, tempLightC.R, tempLightA.R, 0);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, ToneBuffer, 100, tempLightC.G, tempLightA.G, 1);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, ToneBuffer, 100, tempLightC.B, tempLightA.B, 2);
 				rasterizeTriangles(0, 100, ToneBuffer, 100, 100);
 				//Flush YZ to Pixel Buffer
 				for (int z = 0; z < 100; z++) {
 					for (int y = 0; y < 100; y++) {
-						if (ToneBuffer[((100 * z) + y) * 3] != 0) {
-							pIntensity = ToneBuffer[((100 * z) + y) * 3] * 9;
+						if (checkPixel(ToneBuffer, 100, y, z)) {
+							maxIntensity = max(ToneBuffer[((100 * z) + y) * 3] != 0, ToneBuffer[((100 * z) + y) * 3 + 1] != 0);
+							maxIntensity = max(maxIntensity, ToneBuffer[((100 * z) + y) * 3 + 2]);
+							int on = round(9 * maxIntensity);
+							allIntensity = ToneBuffer[((100 * z) + y) * 3] + ToneBuffer[((100 * z) + y) * 3 + 1] + ToneBuffer[((100 * z) + y) * 3 + 2];
+							pIntensity.R = int((ToneBuffer[((100 * z) + y) * 3] / allIntensity) * on);
+							pIntensity.G = int((ToneBuffer[((100 * z) + y) * 3 + 1] / allIntensity) * on);
+							pIntensity.B = int((ToneBuffer[((100 * z) + y) * 3 + 2] / allIntensity) * on);
 							random_shuffle(shuffled.begin(), shuffled.end());
-							for (int i = 0; i < pIntensity; i++) {
+							int numPixels = 0, counter = 0;
+							for (int i = 0; i < pIntensity.R; i++) {
 								yLoc = (y * 3) + (shuffled[i] % 3);
 								zLoc = (z * 3) + (shuffled[i] / 3);
 								xLoc = 0;
 								tempPoint = toPixel(xLoc, yLoc, zLoc, 3);
-								makePixel(tempPoint.y, tempPoint.z, PixelBuffer, 1, windowSizeX);
+								makePixel(tempPoint.y, tempPoint.z, PixelBuffer, windowSizeX, 1, 0, 0, 3);
+								numPixels++;
+							}
+							counter = numPixels;
+							for (int i = counter; i < pIntensity.G + counter; i++) {
+								yLoc = (y * 3) + (shuffled[i] % 3);
+								zLoc = (z * 3) + (shuffled[i] / 3);
+								xLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 3);
+								makePixel(tempPoint.y, tempPoint.z, PixelBuffer, windowSizeX, 0, 1, 0, 3);
+								numPixels++;
+							}
+							counter = numPixels;
+							for (int i = counter; i < pIntensity.B + counter; i++) {
+								yLoc = (y * 3) + (shuffled[i] % 3);
+								zLoc = (z * 3) + (shuffled[i] / 3);
+								xLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 3);
+								makePixel(tempPoint.y, tempPoint.z, PixelBuffer, windowSizeX, 0, 0, 1, 3);
 							}
 						}
 					}
@@ -457,28 +566,62 @@ public:
 				tempLightA = triangles[yLayers[i]].lightIntensity[0];
 				tempLightB = triangles[yLayers[i]].lightIntensity[1];
 				tempLightC = triangles[yLayers[i]].lightIntensity[2];
-				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, ToneBuffer, 100, tempLightA, tempLightB);
-				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, ToneBuffer, 100, tempLightB, tempLightC);
-				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, ToneBuffer, 100, tempLightC, tempLightA);
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, ToneBuffer, 100, tempLightA.R, tempLightB.R, 0);
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, ToneBuffer, 100, tempLightA.G, tempLightB.G, 1);
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, ToneBuffer, 100, tempLightA.B, tempLightB.B, 2);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, ToneBuffer, 100, tempLightB.R, tempLightC.R, 0);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, ToneBuffer, 100, tempLightB.G, tempLightC.G, 1);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, ToneBuffer, 100, tempLightB.B, tempLightC.B, 2);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, ToneBuffer, 100, tempLightC.R, tempLightA.R, 0);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, ToneBuffer, 100, tempLightC.G, tempLightA.G, 1);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, ToneBuffer, 100, tempLightC.B, tempLightA.B, 2);
 				rasterizeTriangles(0, 100, ToneBuffer, 100, 100);
 				//Flush XZ to Pixel Buffer
 				for (int z = 0; z < 100; z++) {
 					for (int x = 0; x < 100; x++) {
-						if (ToneBuffer[((100 * z) + x) * 3] != 0) {
-							pIntensity = ToneBuffer[((100 * z) + x) * 3] * 9;
+						if (checkPixel(ToneBuffer, 100, x, z)) {
+							maxIntensity = max(ToneBuffer[((100 * z) + x) * 3] != 0, ToneBuffer[((100 * z) + x) * 3 + 1] != 0);
+							maxIntensity = max(maxIntensity, ToneBuffer[((100 * z) + x) * 3 + 2]);
+							int on = round(9 * maxIntensity);
+							allIntensity = ToneBuffer[((100 * z) + x) * 3] + ToneBuffer[((100 * z) + x) * 3 + 1] + ToneBuffer[((100 * z) + x) * 3 + 2];
+							pIntensity.R = int((ToneBuffer[((100 * z) + x) * 3] / allIntensity) * on);
+							pIntensity.G = int((ToneBuffer[((100 * z) + x) * 3 + 1] / allIntensity) * on);
+							pIntensity.B = int((ToneBuffer[((100 * z) + x) * 3 + 2] / allIntensity) * on);
 							random_shuffle(shuffled.begin(), shuffled.end());
-							for (int i = 0; i < pIntensity; i++) {
+							int numPixels = 0, counter = 0;
+							for (int i = 0; i < pIntensity.R; i++) {
 								xLoc = (x * 3) + (shuffled[i] % 3);
 								zLoc = (z * 3) + (shuffled[i] / 3);
 								yLoc = 0;
 								tempPoint = toPixel(xLoc, yLoc, zLoc, 2);
-								makePixel(tempPoint.x, tempPoint.z, PixelBuffer, 1, windowSizeX);
+								makePixel(tempPoint.x, tempPoint.z, PixelBuffer, windowSizeX, 1, 0, 0, 3);
+								numPixels++;
+							}
+							counter = numPixels;
+							for (int i = counter; i < pIntensity.G + counter; i++) {
+								xLoc = (x * 3) + (shuffled[i] % 3);
+								zLoc = (z * 3) + (shuffled[i] / 3);
+								yLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 2);
+								makePixel(tempPoint.x, tempPoint.z, PixelBuffer, windowSizeX, 0, 1, 0, 3);
+								numPixels++;
+							}
+							counter = numPixels;
+							for (int i = counter; i < pIntensity.B + counter; i++) {
+								xLoc = (x * 3) + (shuffled[i] % 3);
+								zLoc = (z * 3) + (shuffled[i] / 3);
+								yLoc = 0;
+								tempPoint = toPixel(xLoc, yLoc, zLoc, 2);
+								makePixel(tempPoint.x, tempPoint.z, PixelBuffer, windowSizeX, 0, 0, 1, 3);
 							}
 						}
 					}
 				}
 
 			}
+			//////////////////////////
+			//Regular Implementation//
+			//////////////////////////
 		} else {
 			for (int i = 0; i < triangleCount; i++) {
 				setPixelBuffer(TempBuffer, windowSizeX, windowSizeY);
@@ -492,9 +635,15 @@ public:
 				tempLightA = triangles[zLayers[i]].lightIntensity[0];
 				tempLightB = triangles[zLayers[i]].lightIntensity[1];
 				tempLightC = triangles[zLayers[i]].lightIntensity[2];
-				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA, tempLightB);
-				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB, tempLightC);
-				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC, tempLightA);
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA.R, tempLightB.R, 0);
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA.G, tempLightB.G, 1);
+				Bresenham(temp1.x, temp2.x, temp1.y, temp2.y, TempBuffer, windowSizeX, tempLightA.B, tempLightB.B, 2);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB.R, tempLightC.R, 0);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB.G, tempLightC.G, 1);
+				Bresenham(temp2.x, temp3.x, temp2.y, temp3.y, TempBuffer, windowSizeX, tempLightB.B, tempLightC.B, 2);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC.R, tempLightA.R, 0);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC.G, tempLightA.G, 1);
+				Bresenham(temp3.x, temp1.x, temp3.y, temp1.y, TempBuffer, windowSizeX, tempLightC.B, tempLightA.B, 2);
 
 				//Draw YZ
 				edge1 = triangles[xLayers[i]].a;
@@ -506,9 +655,15 @@ public:
 				tempLightA = triangles[xLayers[i]].lightIntensity[0];
 				tempLightB = triangles[xLayers[i]].lightIntensity[1];
 				tempLightC = triangles[xLayers[i]].lightIntensity[2];
-				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
-				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
-				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA.R, tempLightB.R, 0);
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA.G, tempLightB.G, 1);
+				Bresenham(temp1.y, temp2.y, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA.B, tempLightB.B, 2);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB.R, tempLightC.R, 0);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB.G, tempLightC.G, 1);
+				Bresenham(temp2.y, temp3.y, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB.B, tempLightC.B, 2);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC.R, tempLightA.R, 0);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC.G, tempLightA.G, 1);
+				Bresenham(temp3.y, temp1.y, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC.B, tempLightA.B, 2);
 				//Rasterize the Temp Buffer on left side
 				rasterizeTriangles(0, 500, TempBuffer, windowSizeX, windowSizeY);
 
@@ -522,16 +677,22 @@ public:
 				tempLightA = triangles[yLayers[i]].lightIntensity[0];
 				tempLightB = triangles[yLayers[i]].lightIntensity[1];
 				tempLightC = triangles[yLayers[i]].lightIntensity[2];
-				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA, tempLightB);
-				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB, tempLightC);
-				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC, tempLightA);
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA.R, tempLightB.R, 0);
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA.G, tempLightB.G, 1);
+				Bresenham(temp1.x, temp2.x, temp1.z, temp2.z, TempBuffer, windowSizeX, tempLightA.B, tempLightB.B, 2);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB.R, tempLightC.R, 0);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB.G, tempLightC.G, 1);
+				Bresenham(temp2.x, temp3.x, temp2.z, temp3.z, TempBuffer, windowSizeX, tempLightB.B, tempLightC.B, 2);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC.R, tempLightA.R, 0);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC.G, tempLightA.G, 1);
+				Bresenham(temp3.x, temp1.x, temp3.z, temp1.z, TempBuffer, windowSizeX, tempLightC.B, tempLightA.B, 2);
 				//Rasterize the Temp Buffer on right side
 				rasterizeTriangles(500, 1000, TempBuffer, windowSizeX, windowSizeY);
 
 
 				//Flush Temp Buffer into Pixel Buffer
 				//If value already there it overwrites, unless if there is nothing to write
-				for (int i = 0; i < 1000 * 1000 * 3; i++) {
+				for (int i = 0; i < windowSizeX * windowSizeY * 3; i++) {
 					if (TempBuffer[i] != 0) {
 						PixelBuffer[i] = TempBuffer[i];
 					}
@@ -625,15 +786,31 @@ int main(int argc, char *argv[])
 //Make Pixel Function//
 ///////////////////////
 
-void makePixel(int x, int y, float* PixelBuffer, float intensity, int windowSizeX)
+void makePixel(int x, int y, float* PixelBuffer, int windowSizeX, float Rintensity, float Gintensity, float Bintensity, int mode)
 {
 	//Make sure it is within range
-	if (x > 0 && x < 1000 && y > 0 && y < 1000) {
-		PixelBuffer[((windowSizeX * y) + x) * 3] = intensity;
-		PixelBuffer[(windowSizeX * y + x) * 3 + 1] = intensity;
-		PixelBuffer[(windowSizeX * y + x) * 3 + 2] = intensity;
+	if (mode == 0) {
+		if (x > 0 && x < 1000 && y > 0 && y < 1000) {
+			PixelBuffer[((windowSizeX * y) + x) * 3] = Rintensity;
+		}
 	}
-		
+	else if (mode == 1) {
+		if (x > 0 && x < 1000 && y > 0 && y < 1000) {
+			PixelBuffer[(windowSizeX * y + x) * 3 + 1] = Gintensity;
+		}
+	}
+	else if (mode == 2) {
+		if (x > 0 && x < 1000 && y > 0 && y < 1000) {
+			PixelBuffer[(windowSizeX * y + x) * 3 + 2] = Bintensity;
+		}
+	}
+	else {
+		if (x > 0 && x < 1000 && y > 0 && y < 1000) {
+			PixelBuffer[((windowSizeX * y) + x) * 3] = Rintensity;
+			PixelBuffer[(windowSizeX * y + x) * 3 + 1] = Gintensity;
+			PixelBuffer[(windowSizeX * y + x) * 3 + 2] = Bintensity;
+		}
+	}	
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -738,23 +915,60 @@ void getSettings2() {
 
 	cout << "n: ";
 	cin >> n;
-	cout << "Ambient: ";
-	cin >> ka;
-	while (ka < 0 || ka > 1) {
-		cout << "Please Enter a value between 0 and 1\nAmbient: ";
-		cin >> ka;
+
+	cout << "Ka\n  R:";
+	cin >> ka.R;
+	while (ka.R < 0 || ka.R > 1) {
+		cout << "Please Enter a value between 0 and 1\R: ";
+		cin >> ka.R;
 	}
-	cout << "Diffuse: ";
-	cin >> kd;
-	while (kd < 0 || kd > 1) {
-		cout << "Please Enter a value between 0 and 1\nDiffuse: ";
-		cin >> kd;
+	cout << "  G: ";
+	cin >> ka.G;
+	while (ka.G < 0 || ka.G > 1) {
+		cout << "Please Enter a value between 0 and 1\G: ";
+		cin >> ka.G;
 	}
-	cout << "Specular: ";
-	cin >> ks;
-	while (ks < 0 || ks > 1) {
-		cout << "Please Enter a value between 0 and 1\nSpecular: ";
-		cin >> ks;
+	cout << "  B: ";
+	cin >> ka.B;
+	while (ka.B < 0 || ka.B > 1) {
+		cout << "Please Enter a value between 0 and 1\B: ";
+		cin >> ka.B;
+	}
+	cout << "Kd\n  R:";
+	cin >> kd.R;
+	while (kd.R < 0 || kd.R > 1) {
+		cout << "Please Enter a value between 0 and 1\R: ";
+		cin >> kd.R;
+	}
+	cout << "  G: ";
+	cin >> kd.G;
+	while (kd.G < 0 || kd.G > 1) {
+		cout << "Please Enter a value between 0 and 1\G: ";
+		cin >> kd.G;
+	}
+	cout << "  B: ";
+	cin >> kd.B;
+	while (kd.B < 0 || kd.B > 1) {
+		cout << "Please Enter a value between 0 and 1\B: ";
+		cin >> kd.B;
+	}
+	cout << "Ka\n  R:";
+	cin >> ks.R;
+	while (ks.R < 0 || ks.R > 1) {
+		cout << "Please Enter a value between 0 and 1\R: ";
+		cin >> ks.R;
+	}
+	cout << "  G: ";
+	cin >> ks.G;
+	while (ks.G < 0 || ks.G > 1) {
+		cout << "Please Enter a value between 0 and 1\G: ";
+		cin >> ks.G;
+	}
+	cout << "  B: ";
+	cin >> ks.B;
+	while (ks.B < 0 || ks.B > 1) {
+		cout << "Please Enter a value between 0 and 1\B: ";
+		cin >> ks.B;
 	}
 	
 	cout << "X\n  x: ";
@@ -784,28 +998,28 @@ void getSettings2() {
 /////////////////////////////////////////////////////////////////////////////////
 void setScreen() {
 	//Draw borders
-	drawBresenham(0, 500, 1000, 500, 1, 1);
-	drawBresenham(500, 0, 500, 1000, 1, 1);
+	drawBresenham(0, 500, 1000, 500, 1, 1, 3);
+	drawBresenham(500, 0, 500, 1000, 1, 1, 3);
 
 	//Draw XY
-	drawBresenham(0, 520, 10, 500, 1, 1);
-	drawBresenham(10, 520, 0, 500, 1, 1);
-	drawBresenham(20, 520, 25, 510, 1, 1);
-	drawBresenham(30, 520, 20, 500, 1, 1);
+	drawBresenham(0, 520, 10, 500, 1, 1, 3);
+	drawBresenham(10, 520, 0, 500, 1, 1, 3);
+	drawBresenham(20, 520, 25, 510, 1, 1, 3);
+	drawBresenham(30, 520, 20, 500, 1, 1, 3);
 
 	//Draw XZ
-	drawBresenham(500, 520, 510, 500, 1, 1);
-	drawBresenham(510, 520, 500, 500, 1, 1);
-	drawBresenham(520, 520, 530, 520, 1, 1);
-	drawBresenham(530, 520, 520, 503, 1, 1);
-	drawBresenham(520, 503, 530, 503, 1, 1);
+	drawBresenham(500, 520, 510, 500, 1, 1, 3);
+	drawBresenham(510, 520, 500, 500, 1, 1, 3);
+	drawBresenham(520, 520, 530, 520, 1, 1, 3);
+	drawBresenham(530, 520, 520, 503, 1, 1, 3);
+	drawBresenham(520, 503, 530, 503, 1, 1, 3);
 
 	//Draw YZ
-	drawBresenham(0, 20, 5, 10, 1, 1);
-	drawBresenham(10, 20, 0, 0, 1, 1);
-	drawBresenham(20, 20, 30, 20, 1, 1);
-	drawBresenham(30, 20, 20, 3, 1, 1);
-	drawBresenham(20, 3, 30, 3, 1, 1);
+	drawBresenham(0, 20, 5, 10, 1, 1, 3);
+	drawBresenham(10, 20, 0, 0, 1, 1, 3);
+	drawBresenham(20, 20, 30, 20, 1, 1, 3);
+	drawBresenham(30, 20, 20, 3, 1, 1, 3);
+	drawBresenham(20, 3, 30, 3, 1, 1, 3);
 }
 
 //Set a new boundary box if values are outside the current range!
